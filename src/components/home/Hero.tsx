@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
+import CapacityBadge from "./CapacityBadge";
 
 export default function Hero() {
   return (
@@ -36,12 +37,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Corner tick */}
-      <div className="absolute right-6 top-24 md:right-12 md:top-32 z-10 hidden md:flex items-center gap-3 text-[11px] tracking-[0.4em] uppercase text-muted-foreground">
-        <span>Cinematic Films</span>
-        <span className="h-px w-8 bg-muted-foreground/40" />
-        <span>2026</span>
-      </div>
+      {/* Scarcity / capacity widget (replaces the corner tick) */}
+      <CapacityBadge />
 
       {/* Center text */}
       <div className="relative z-10 container flex min-h-screen flex-col justify-center pt-24 pb-24">

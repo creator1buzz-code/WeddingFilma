@@ -11,12 +11,13 @@
 4. **Studio admin** managing bookings, gallery, testimonials, packages.
 
 ## Phase 1 – DONE (Feb 2026)
-- Premium cinematic marketing site: Hero (autoplay video), Portfolio (masonry + filter), Featured Films (carousel), Stats (animated counters), Why-Choose, Services, Testimonials, FAQ (accordion), Instagram feed, Contact CTA. Dark/light mode.
+- Premium cinematic marketing site: Hero (autoplay video, **"Reserve your date" scarcity widget** in top-right), Portfolio (masonry + filter), Featured Films (carousel), Stats (animated counters), Why-Choose, Services, Testimonials, FAQ (accordion), Instagram feed, Contact CTA. Dark/light mode.
 - Portfolio archive page with masonry, category filter, search, lightbox, load-more.
 - Booking system: `/booking` form → validated Zod payload → Prisma → unique code → Resend confirmation to client + admin.
-- Admin dashboard: `/admin` (stats), `/admin/bookings` (+ CSV export), `/admin/gallery`, `/admin/testimonials`, `/admin/packages`, `/admin/clients`, `/admin/login` (Supabase Auth), middleware-guarded.
+- Admin dashboard: `/admin` (stats), `/admin/bookings` (+ CSV export), `/admin/capacity` (scarcity engine), `/admin/gallery`, `/admin/testimonials`, `/admin/packages`, `/admin/clients`, `/admin/login` (Supabase Auth), middleware-guarded.
+- Scarcity engine: `year_capacity` table + `/api/capacity` (5-min cached) + admin form to update `booked/total` per year — widget updates on save.
 - About/Studio page, Contact page (with `/api/contact`), SEO (metadata, sitemap, robots, OG, Twitter card).
-- Complete Prisma schema + Supabase SQL migrations (schema + RLS policies) + seed data.
+- Complete Prisma schema + Supabase SQL migrations (001 schema, 002 RLS, 003 year_capacity) + seed data.
 - Comprehensive README covering Supabase setup, Prisma migrations, Resend, Vercel deploy, GoDaddy DNS, Google Workspace.
 
 ## Backlog (Phase 2)

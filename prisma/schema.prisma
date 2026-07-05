@@ -192,3 +192,12 @@ model AuditLog {
   @@index([entity, entityId])
   @@map("audit_logs")
 }
+
+model YearCapacity {
+  year       Int      @id
+  totalSlots Int      @default(12)
+  booked     Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@map("year_capacity")
+}

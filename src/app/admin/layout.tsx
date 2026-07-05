@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LayoutDashboard, CalendarDays, Users, Image as ImageIcon, MessageSquareQuote, Package, LogOut } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Image as ImageIcon, MessageSquareQuote, Package, LogOut, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 
 const nav = [
   { href: "/admin", label: "Dashboard", Icon: LayoutDashboard },
   { href: "/admin/bookings", label: "Bookings", Icon: CalendarDays },
+  { href: "/admin/capacity", label: "Capacity", Icon: Sparkles },
   { href: "/admin/clients", label: "Clients", Icon: Users },
   { href: "/admin/gallery", label: "Gallery", Icon: ImageIcon },
   { href: "/admin/testimonials", label: "Testimonials", Icon: MessageSquareQuote },
