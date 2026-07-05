@@ -17,6 +17,8 @@ enum Role {
   EDITOR
   PHOTOGRAPHER
   CLIENT
+
+  @@map("role")
 }
 
 enum BookingStatus {
@@ -26,6 +28,8 @@ enum BookingStatus {
   IN_PROGRESS
   COMPLETED
   CANCELLED
+
+  @@map("booking_status")
 }
 
 enum EventType {
@@ -38,11 +42,15 @@ enum EventType {
   PRODUCT
   EVENT
   OTHER
+
+  @@map("event_type")
 }
 
 enum MediaType {
   IMAGE
   VIDEO
+
+  @@map("media_type")
 }
 
 enum GalleryCategory {
@@ -53,6 +61,155 @@ enum GalleryCategory {
   CORPORATE
   PRODUCT
   EVENT
+
+  @@map("gallery_category")
+}
+
+model Profile {
+  id        String   @id @db.Uuid // maps to auth.users.id
+  email     String   @unique
+  fullName  String?  @map("full_name")
+  phone     String?
+  role      Role     @default(CLIENT)
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bookings Booking[] @relation("ClientBookings")
+
+  @@map("profiles")
+}
+
+model Booking {
+  id          String        @id @default(uuid()) @db.Uuid
+  bookingCode String        @unique @map("booking_code")
+  clientId    String?       @db.Uuid @map("client_id")
+  fullName    String        @map("full_name")
+  email       String
+  phone       String
+  eventType   EventType     @map("event_type")
+  eventDate   DateTime      @map("event_date") @db.Date
+  venue       String?
+  city        String
+  budget      String?
+  guestCount  Int?          @map("guest_count")
+  services    String[]      @default([])
+  notes       String?
+  status      BookingStatus @default(NEW)
+  packageId   String?       @db.Uuid @map("package_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  client  Profile? @relation("ClientBookings", fields: [clientId], references: [id], onDelete: SetNull)
+  package Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([eventDate])
+  @@map("bookings")
+}
+
+model GalleryItem {
+  id          String          @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  category    GalleryCategory
+  mediaType   MediaType       @default(IMAGE) @map("media_type")
+  url         String
+  thumbnail   String?
+  tags        String[]        @default([])
+  featured    Boolean         @default(false)
+  orderIndex  Int             @default(0) @map("order_index")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([featured])
+  @@map("gallery_items")
+}
+
+model Testimonial {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  location  String?
+  eventType EventType @map("event_type")
+  rating    Int       @default(5)
+  quote     String
+  avatarUrl String?   @map("avatar_url")
+  featured  Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("testimonials")
+}
+
+model Package {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  tagline     String?
+  description String?
+  priceFrom   Int      @map("price_from")
+  currency    String   @default("INR")
+  duration    String?
+  includes    String[] @default([])
+  popular     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  bookings Booking[]
+
+  @@map("packages")
+}
+
+model ContactMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  email     String
+  phone     String?
+  subject   String?
+  message   String
+  handled   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_messages")
+}
+
+model BlogPost {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  title       String
+  excerpt     String?
+  content     String
+  coverImage  String?   @map("cover_image")
+  authorId    String?   @db.Uuid @map("author_id")
+  published   Boolean   @default(false)
+  publishedAt DateTime? @map("published_at")
+  tags        String[]  @default([])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@map("blog_posts")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  actorId   String?  @db.Uuid @map("actor_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model YearCapacity {
+  year       Int      @id
+  totalSlots Int      @default(12) @map("total_slots")
+  booked     Int      @default(0)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("year_capacity")
 }
 
 model Profile {
