@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
 
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file") as File;
 
     if (!file) {
       return NextResponse.json(
@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     }
 
     const title =
-      (formData.get("title") as string) || file.name.split(".")[0];
+      (formData.get("title") as string) ||
+      file.name.replace(/\.[^/.]+$/, "");
 
     const description =
       (formData.get("description") as string) || "";
@@ -31,33 +32,32 @@ export async function POST(req: NextRequest) {
       ? "VIDEO"
       : "IMAGE";
 
-    const extension = file.name.split(".").pop();
+    const ext = file.name.split(".").pop();
 
-    const fileName = `${crypto.randomUUID()}.${extension}`;
+    const fileName = `${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
-    const arrayBuffer = await file.arrayBuffer();
+    const bytes = await file.arrayBuffer();
 
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = Buffer.from(bytes);
 
-    const { error } = await supabaseAdmin.storage
+    const upload = await supabaseAdmin.storage
       .from("gallery")
       .upload(fileName, buffer, {
         contentType: file.type,
-        upsert: false,
       });
 
-    if (error) {
-      console.error(error);
+    if (upload.error) {
+      console.error(upload.error);
 
       return NextResponse.json(
-        { error: error.message },
+        { error: upload.error.message },
         { status: 500 }
       );
     }
 
-    const { data } = supabaseAdmin.storage
+    const publicUrl = supabaseAdmin.storage
       .from("gallery")
-      .getPublicUrl(fileName);
+      .getPublicUrl(fileName).data.publicUrl;
 
     const item = await prisma.galleryItem.create({
       data: {
@@ -65,20 +65,23 @@ export async function POST(req: NextRequest) {
         description,
         category: category as any,
         mediaType: mediaType as any,
-        url: data.publicUrl,
-        thumbnail: data.publicUrl,
+        url: publicUrl,
+        thumbnail: publicUrl,
         featured,
         tags: [],
       },
     });
 
     return NextResponse.json(item);
-  } catch (err) {
-    console.error(err);
+
+  } catch (e) {
+
+    console.error(e);
 
     return NextResponse.json(
       { error: "Upload failed" },
       { status: 500 }
     );
+
   }
 }
