@@ -124,6 +124,9 @@ export default function GalleryUploader() {
                 </Button>
 
                 <Button>
+                  onClick={upload}
+                  disabled={!file}
+                >
                   Upload
                 </Button>
 
