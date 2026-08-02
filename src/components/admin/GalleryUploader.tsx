@@ -28,6 +28,33 @@ export default function GalleryUploader() {
 
   const [featured, setFeatured] = useState(false);
 
+  async function upload() {
+    if (!file) return;
+
+    const form = new FormData();
+
+    form.append("file", file);
+    form.append("title", title);
+    form.append("description", description);
+    form.append("category", category);
+    form.append("featured", String(featured));
+
+    const res = await fetch("/api/admin/gallery", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || "Upload failed");
+      return;
+    }
+
+    setOpen(false);
+
+    window.location.reload();
+  }
+
   return (
     <>
       <Button onClick={() => setOpen(true)}>
