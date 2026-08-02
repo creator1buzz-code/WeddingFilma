@@ -17,42 +17,57 @@ export default function GalleryUploader() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
-
   const [file, setFile] = useState<File | null>(null);
-
   const [title, setTitle] = useState("");
-
   const [description, setDescription] = useState("");
-
   const [category, setCategory] = useState("WEDDINGS");
-
   const [featured, setFeatured] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   async function upload() {
-    if (!file) return;
-
-    const form = new FormData();
-
-    form.append("file", file);
-    form.append("title", title);
-    form.append("description", description);
-    form.append("category", category);
-    form.append("featured", String(featured));
-
-    const res = await fetch("/api/admin/gallery", {
-      method: "POST",
-      body: form,
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || "Upload failed");
+    if (!file) {
+      alert("Please select a file.");
       return;
     }
 
-    setOpen(false);
+    try {
+      setUploading(true);
 
-    window.location.reload();
+      const form = new FormData();
+
+      form.append("file", file);
+      form.append("title", title);
+      form.append("description", description);
+      form.append("category", category);
+      form.append("featured", String(featured));
+
+      const res = await fetch("/api/admin/gallery", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Upload failed");
+        return;
+      }
+
+      setOpen(false);
+
+      setFile(null);
+      setTitle("");
+      setDescription("");
+      setCategory("WEDDINGS");
+      setFeatured(false);
+
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -62,35 +77,33 @@ export default function GalleryUploader() {
       </Button>
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
 
-          <div className="bg-background border border-border rounded-lg w-full max-w-lg p-8">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-background p-8">
 
-            <h2 className="font-serif text-3xl mb-6">
+            <h2 className="mb-6 font-serif text-3xl">
               Upload Media
             </h2>
 
             <div className="space-y-5">
 
               <Field label="Image / Video">
-
                 <input
                   ref={fileInput}
                   type="file"
                   accept="image/*,video/*"
                   onChange={(e) => {
-                    if (e.target.files?.length) {
-                      setFile(e.target.files[0]);
+                    if (!e.target.files?.length) return;
 
-                      if (!title) {
-                        setTitle(
-                          e.target.files[0].name.split(".")[0]
-                        );
-                      }
+                    const selected = e.target.files[0];
+
+                    setFile(selected);
+
+                    if (!title) {
+                      setTitle(selected.name.replace(/\.[^/.]+$/, ""));
                     }
                   }}
                 />
-
               </Field>
 
               <Field label="Title">
@@ -103,58 +116,49 @@ export default function GalleryUploader() {
               <Field label="Description">
                 <Textarea
                   value={description}
-                  onChange={(e) =>
-                    setDescription(e.target.value)
-                  }
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </Field>
 
               <Field label="Category">
-
                 <select
-                  className="w-full border border-border bg-transparent p-3 rounded-sm"
+                  className="w-full rounded-sm border border-border bg-transparent p-3"
                   value={category}
-                  onChange={(e) =>
-                    setCategory(e.target.value)
-                  }
+                  onChange={(e) => setCategory(e.target.value)}
                 >
                   {categories.map((c) => (
                     <option key={c} value={c}>
-                      {c.replace("_", " ")}
+                      {c.replaceAll("_", " ")}
                     </option>
                   ))}
                 </select>
-
               </Field>
 
               <label className="flex items-center gap-3">
-
                 <input
                   type="checkbox"
                   checked={featured}
-                  onChange={(e) =>
-                    setFeatured(e.target.checked)
-                  }
+                  onChange={(e) => setFeatured(e.target.checked)}
                 />
-
                 Featured
-
               </label>
 
               <div className="flex justify-end gap-3">
 
                 <Button
                   variant="ghost"
+                  type="button"
                   onClick={() => setOpen(false)}
                 >
                   Cancel
                 </Button>
 
-                <Button>
+                <Button
+                  type="button"
                   onClick={upload}
-                  disabled={!file}
+                  disabled={!file || uploading}
                 >
-                  Upload
+                  {uploading ? "Uploading..." : "Upload"}
                 </Button>
 
               </div>
