@@ -1,3 +1,4 @@
+import GalleryUploader from "@/components/admin/GalleryUploader";
 import { prisma } from "@/lib/prisma";
 
 async function get() {
