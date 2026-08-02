@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export const revalidate = 300; // cache 5 min
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs"; // cache 5 min
 
 export async function GET() {
   const year = new Date().getFullYear();
