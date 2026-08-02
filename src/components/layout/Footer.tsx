@@ -43,7 +43,7 @@ export default function Footer() {
           <p className="text-xs tracking-[0.24em] uppercase text-muted-foreground mb-5">Reach us</p>
           <ul className="space-y-3 text-sm">
             <li className="flex items-center gap-2"><Mail className="h-4 w-4 text-accent" /> bookings@weddingfilma.in</li>
-            <li className="flex items-center gap-2"><Phone className="h-4 w-4 text-accent" /> +91 98XXX XXXXX</li>
+            <li className="flex items-center gap-2"><Phone className="h-4 w-4 text-accent" /> +91 89990 50138</li>
             <li className="text-muted-foreground text-xs mt-4">Serving weddings PAN-India & destinations worldwide</li>
           </ul>
         </div>
