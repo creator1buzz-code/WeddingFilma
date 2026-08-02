@@ -44,8 +44,8 @@ export default function ContactPage() {
 
           <ul className="mt-12 space-y-6 text-sm">
             <li className="flex items-center gap-4"><Mail className="h-5 w-5 text-accent" /> bookings@weddingfilma.in</li>
-            <li className="flex items-center gap-4"><Phone className="h-5 w-5 text-accent" /> +91 98XXX XXXXX</li>
-            <li className="flex items-center gap-4"><MapPin className="h-5 w-5 text-accent" /> Bandra West, Mumbai · Studio by appointment</li>
+            <li className="flex items-center gap-4"><Phone className="h-5 w-5 text-accent" /> +91 89990 50138</li>
+            <li className="flex items-center gap-4"><MapPin className="h-5 w-5 text-accent" /> Dehu Road, Pune · Studio by appointment</li>
           </ul>
         </div>
 
