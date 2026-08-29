@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const BUCKET = "gallery";
 
@@ -30,17 +30,23 @@ const ALLOWED_VIDEO_TYPES = [
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ error: message }, { status });
+function jsonError(
+  message: string,
+  status = 400,
+) {
+  return NextResponse.json(
+    { error: message },
+    { status },
+  );
 }
 
 /**
- * POST /api/admin/gallery
+ * POST
  *
- * This endpoint NO LONGER receives the actual file.
+ * Creates the Prisma GalleryItem record.
  *
- * The browser uploads the file directly to Supabase Storage.
- * This endpoint only creates the Prisma GalleryItem record.
+ * IMPORTANT:
+ * The actual image/video is NOT sent to this endpoint.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -62,43 +68,71 @@ export async function POST(req: NextRequest) {
       return jsonError("A title is required.");
     }
 
-    if (!category || !ALLOWED_CATEGORIES.includes(category)) {
-      return jsonError("Invalid gallery category.");
+    if (
+      !category ||
+      !ALLOWED_CATEGORIES.includes(category)
+    ) {
+      return jsonError(
+        "Invalid gallery category.",
+      );
     }
 
     if (!url || typeof url !== "string") {
-      return jsonError("A gallery URL is required.");
+      return jsonError(
+        "A gallery URL is required.",
+      );
     }
 
-    if (!storagePath || typeof storagePath !== "string") {
-      return jsonError("Storage path is required.");
+    if (
+      !storagePath ||
+      typeof storagePath !== "string"
+    ) {
+      return jsonError(
+        "Storage path is required.",
+      );
     }
 
-    if (mediaType !== "IMAGE" && mediaType !== "VIDEO") {
-      return jsonError("Invalid media type.");
+    if (
+      mediaType !== "IMAGE" &&
+      mediaType !== "VIDEO"
+    ) {
+      return jsonError(
+        "Invalid media type.",
+      );
     }
 
-    const item = await prisma.galleryItem.create({
-      data: {
-        title: title.trim(),
-        description:
-          typeof description === "string"
-            ? description.trim() || null
-            : null,
+    const item =
+      await prisma.galleryItem.create({
+        data: {
+          title: title.trim(),
 
-        category: category as any,
-        mediaType: mediaType as any,
+          description:
+            typeof description === "string"
+              ? description.trim() || null
+              : null,
 
-        url,
-        thumbnail: thumbnail || url,
+          category: category as any,
 
-        featured: Boolean(featured),
+          mediaType: mediaType as any,
 
-        tags: Array.isArray(tags)
-          ? tags.filter((tag: unknown): tag is string => typeof tag === "string")
-          : [],
-      },
-    });
+          url,
+
+          thumbnail:
+            thumbnail || url,
+
+          featured: Boolean(featured),
+
+          tags: Array.isArray(tags)
+            ? tags.filter(
+                (
+                  tag: unknown,
+                ): tag is string =>
+                  typeof tag ===
+                  "string",
+              )
+            : [],
+        },
+      });
 
     return NextResponse.json(
       {
@@ -108,11 +142,15 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
-    console.error("Gallery metadata creation failed:", error);
+    console.error(
+      "Gallery metadata creation failed:",
+      error,
+    );
 
     return NextResponse.json(
       {
-        error: "Failed to create gallery item.",
+        error:
+          "Failed to create gallery item.",
       },
       { status: 500 },
     );
@@ -120,12 +158,12 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * POST /api/admin/gallery?upload=authorize
+ * PUT
  *
- * Creates a temporary signed upload URL.
+ * Creates a signed upload token for the browser.
  *
  * IMPORTANT:
- * The actual image/video is NOT sent through Vercel.
+ * The actual file is NOT uploaded through Vercel.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -137,24 +175,48 @@ export async function PUT(req: NextRequest) {
       fileSize,
     } = body;
 
-    if (!fileName || typeof fileName !== "string") {
-      return jsonError("File name is required.");
+    if (
+      !fileName ||
+      typeof fileName !== "string"
+    ) {
+      return jsonError(
+        "File name is required.",
+      );
     }
 
-    if (!contentType || typeof contentType !== "string") {
-      return jsonError("File type is required.");
+    if (
+      !contentType ||
+      typeof contentType !== "string"
+    ) {
+      return jsonError(
+        "File type is required.",
+      );
     }
 
-    if (!Number.isFinite(fileSize) || fileSize <= 0) {
-      return jsonError("Invalid file size.");
+    if (
+      !Number.isFinite(fileSize) ||
+      fileSize <= 0
+    ) {
+      return jsonError(
+        "Invalid file size.",
+      );
     }
 
     if (fileSize > MAX_FILE_SIZE) {
-      return jsonError("File is larger than the 50 MB gallery limit.");
+      return jsonError(
+        "File is larger than the 50 MB gallery limit.",
+      );
     }
 
-    const isImage = ALLOWED_IMAGE_TYPES.includes(contentType);
-    const isVideo = ALLOWED_VIDEO_TYPES.includes(contentType);
+    const isImage =
+      ALLOWED_IMAGE_TYPES.includes(
+        contentType,
+      );
+
+    const isVideo =
+      ALLOWED_VIDEO_TYPES.includes(
+        contentType,
+      );
 
     if (!isImage && !isVideo) {
       return jsonError(
@@ -163,24 +225,57 @@ export async function PUT(req: NextRequest) {
     }
 
     const extension =
-      fileName.split(".").pop()?.toLowerCase() || "bin";
+      fileName
+        .split(".")
+        .pop()
+        ?.toLowerCase() || "bin";
 
-    const safeExtension = extension.replace(/[^a-z0-9]/g, "");
+    const safeExtension =
+      extension.replace(
+        /[^a-z0-9]/g,
+        "",
+      );
 
     const uniqueName =
       `${crypto.randomUUID()}.${safeExtension}`;
 
-    const storagePath = `gallery/${uniqueName}`;
+    /*
+     * IMPORTANT:
+     *
+     * This is the path INSIDE the gallery bucket.
+     *
+     * DO NOT use:
+     *
+     * gallery/filename.jpg
+     *
+     * because we already call:
+     *
+     * .from("gallery")
+     */
+    const storagePath =
+      uniqueName;
 
-    const { data, error } =
+    const supabaseAdmin =
+      getSupabaseAdmin();
+
+    const {
+      data,
+      error,
+    } =
       await supabaseAdmin.storage
         .from(BUCKET)
-        .createSignedUploadUrl(storagePath, {
-          upsert: false,
-        });
+        .createSignedUploadUrl(
+          storagePath,
+          {
+            upsert: false,
+          },
+        );
 
     if (error || !data) {
-      console.error("Signed upload URL error:", error);
+      console.error(
+        "Signed upload URL error:",
+        error,
+      );
 
       return NextResponse.json(
         {
@@ -193,7 +288,8 @@ export async function PUT(req: NextRequest) {
     }
 
     const projectUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+      process.env
+        .NEXT_PUBLIC_SUPABASE_URL;
 
     if (!projectUrl) {
       return jsonError(
@@ -202,13 +298,25 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const projectId = new URL(projectUrl).hostname.split(".")[0];
+    const projectId =
+      new URL(
+        projectUrl,
+      ).hostname.split(".")[0];
 
     return NextResponse.json({
       success: true,
 
       bucket: BUCKET,
 
+      /*
+       * This is now just:
+       *
+       * abc123.jpg
+       *
+       * rather than:
+       *
+       * gallery/abc123.jpg
+       */
       path: storagePath,
 
       token: data.token,
@@ -220,11 +328,17 @@ export async function PUT(req: NextRequest) {
       fileSize,
     });
   } catch (error) {
-    console.error("Gallery upload authorization failed:", error);
+    console.error(
+      "Gallery upload authorization failed:",
+      error,
+    );
 
     return NextResponse.json(
       {
-        error: "Unable to authorize gallery upload.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Unable to authorize gallery upload.",
       },
       { status: 500 },
     );
@@ -232,59 +346,95 @@ export async function PUT(req: NextRequest) {
 }
 
 /**
- * DELETE /api/admin/gallery?id=...
+ * DELETE
  *
  * Deletes both:
- * 1. Prisma GalleryItem
- * 2. Supabase Storage object
+ *
+ * 1. Supabase Storage object
+ * 2. Prisma GalleryItem
  */
-export async function DELETE(req: NextRequest) {
+export async function DELETE(
+  req: NextRequest,
+) {
   try {
-    const { searchParams } = new URL(req.url);
+    const { searchParams } =
+      new URL(req.url);
 
-    const id = searchParams.get("id");
+    const id =
+      searchParams.get("id");
 
     if (!id) {
-      return jsonError("Gallery item ID is required.");
+      return jsonError(
+        "Gallery item ID is required.",
+      );
     }
 
-    const item = await prisma.galleryItem.findUnique({
-      where: { id },
-    });
+    const item =
+      await prisma.galleryItem.findUnique(
+        {
+          where: { id },
+        },
+      );
 
     if (!item) {
-      return jsonError("Gallery item not found.", 404);
+      return jsonError(
+        "Gallery item not found.",
+        404,
+      );
     }
 
-    let storagePath: string | null = null;
+    let storagePath:
+      | string
+      | null = null;
 
     try {
-      const url = new URL(item.url);
+      const url =
+        new URL(item.url);
 
       const marker =
         `/storage/v1/object/public/${BUCKET}/`;
 
-      const index = url.pathname.indexOf(marker);
+      const index =
+        url.pathname.indexOf(marker);
 
       if (index !== -1) {
-        storagePath = decodeURIComponent(
-          url.pathname.substring(index + marker.length),
-        );
+        storagePath =
+          decodeURIComponent(
+            url.pathname.substring(
+              index +
+                marker.length,
+            ),
+          );
       }
     } catch {
-      // If URL parsing fails, continue with database deletion.
+      console.error(
+        "Could not parse gallery URL:",
+        item.url,
+      );
     }
 
     if (storagePath) {
-      const { error } =
-        await supabaseAdmin.storage
-          .from(BUCKET)
-          .remove([storagePath]);
+      try {
+        const supabaseAdmin =
+          getSupabaseAdmin();
 
-      if (error) {
+        const { error } =
+          await supabaseAdmin.storage
+            .from(BUCKET)
+            .remove([
+              storagePath,
+            ]);
+
+        if (error) {
+          console.error(
+            "Storage deletion failed:",
+            error,
+          );
+        }
+      } catch (storageError) {
         console.error(
-          "Storage deletion failed:",
-          error,
+          "Storage client error:",
+          storageError,
         );
       }
     }
@@ -297,11 +447,15 @@ export async function DELETE(req: NextRequest) {
       success: true,
     });
   } catch (error) {
-    console.error("Gallery deletion failed:", error);
+    console.error(
+      "Gallery deletion failed:",
+      error,
+    );
 
     return NextResponse.json(
       {
-        error: "Failed to delete gallery item.",
+        error:
+          "Failed to delete gallery item.",
       },
       { status: 500 },
     );
