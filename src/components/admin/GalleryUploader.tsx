@@ -1,10 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
-import * as tus from "tus-js-client";
+import {
+  useRef,
+  useState,
+} from "react";
 
-import { Button, Field, Input, Textarea } from "@/components/ui/form";
-import { createClient } from "@/lib/supabase/client";
+import {
+  Button,
+  Field,
+  Input,
+  Textarea,
+} from "@/components/ui/form";
 
 const categories = [
   "WEDDINGS",
@@ -16,9 +22,8 @@ const categories = [
   "EVENT",
 ];
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
-const LARGE_FILE_THRESHOLD = 6 * 1024 * 1024;
+const MAX_FILE_SIZE =
+  50 * 1024 * 1024;
 
 const ALLOWED_TYPES = [
   "image/jpeg",
@@ -32,33 +37,52 @@ const ALLOWED_TYPES = [
 ];
 
 export default function GalleryUploader() {
-  const fileInput = useRef<HTMLInputElement>(null);
+  const fileInput =
+    useRef<HTMLInputElement>(null);
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] =
+    useState(false);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] =
+    useState<File | null>(null);
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] =
+    useState("");
 
-  const [description, setDescription] = useState("");
+  const [description, setDescription] =
+    useState("");
 
-  const [category, setCategory] = useState("WEDDINGS");
+  const [category, setCategory] =
+    useState("WEDDINGS");
 
-  const [featured, setFeatured] = useState(false);
+  const [featured, setFeatured] =
+    useState(false);
 
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] =
+    useState(false);
 
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] =
+    useState(0);
 
-  const [error, setError] = useState("");
+  const [error, setError] =
+    useState("");
 
+  /**
+   * Reset the form.
+   */
   function resetForm() {
     setFile(null);
+
     setTitle("");
+
     setDescription("");
+
     setCategory("WEDDINGS");
+
     setFeatured(false);
+
     setProgress(0);
+
     setError("");
 
     if (fileInput.current) {
@@ -66,23 +90,42 @@ export default function GalleryUploader() {
     }
   }
 
+  /**
+   * Close modal.
+   */
   function closeModal() {
-    if (uploading) return;
+    if (uploading) {
+      return;
+    }
 
     setOpen(false);
+
     resetForm();
   }
 
+  /**
+   * File selection.
+   */
   function handleFileChange(
     event: React.ChangeEvent<HTMLInputElement>,
   ) {
-    const selectedFile = event.target.files?.[0];
+    const selectedFile =
+      event.target.files?.[0];
 
-    if (!selectedFile) return;
+    if (!selectedFile) {
+      return;
+    }
 
     setError("");
 
-    if (!ALLOWED_TYPES.includes(selectedFile.type)) {
+    /**
+     * Validate MIME type.
+     */
+    if (
+      !ALLOWED_TYPES.includes(
+        selectedFile.type,
+      )
+    ) {
       setFile(null);
 
       setError(
@@ -92,7 +135,13 @@ export default function GalleryUploader() {
       return;
     }
 
-    if (selectedFile.size > MAX_FILE_SIZE) {
+    /**
+     * Validate maximum size.
+     */
+    if (
+      selectedFile.size >
+      MAX_FILE_SIZE
+    ) {
       setFile(null);
 
       setError(
@@ -104,156 +153,249 @@ export default function GalleryUploader() {
 
     setFile(selectedFile);
 
+    /**
+     * Automatically use filename
+     * as title if title is empty.
+     */
     if (!title) {
       setTitle(
-        selectedFile.name.replace(/\.[^/.]+$/, ""),
+        selectedFile.name.replace(
+          /\.[^/.]+$/,
+          "",
+        ),
       );
     }
   }
 
-  async function uploadSmallFile(
+  /**
+   * Upload file directly to Supabase
+   * using a signed upload URL.
+   *
+   * IMPORTANT:
+   *
+   * No Vercel file upload happens here.
+   *
+   * Browser
+   *   ↓
+   * Supabase Storage
+   *
+   * The signed URL is temporary and
+   * limited to this upload.
+   */
+  async function uploadFileToSignedUrl(
     file: File,
-    path: string,
+    signedUrl: string,
   ) {
-    const supabase = createClient();
+    return new Promise<void>(
+      (
+        resolve,
+        reject,
+      ) => {
+        const xhr =
+          new XMLHttpRequest();
 
-    const { error: uploadError } =
-      await supabase.storage
-        .from("gallery")
-        .upload(path, file, {
-          contentType: file.type,
-          cacheControl: "3600",
-          upsert: false,
-        });
+        /**
+         * Open direct PUT request
+         * to Supabase Storage.
+         */
+        xhr.open(
+          "PUT",
+          signedUrl,
+          true,
+        );
 
-    if (uploadError) {
-      throw new Error(uploadError.message);
-    }
-  }
+        /**
+         * Content type.
+         */
+        xhr.setRequestHeader(
+          "Content-Type",
+          file.type,
+        );
 
-  async function uploadLargeFile(
-    file: File,
-    path: string,
-    token: string,
-    projectId: string,
-  ) {
-    const supabaseUrl =
-      process.env.NEXT_PUBLIC_SUPABASE_URL;
+        /**
+         * Cache control.
+         */
+        xhr.setRequestHeader(
+          "Cache-Control",
+          "max-age=3600",
+        );
 
-    if (!supabaseUrl) {
-      throw new Error(
-        "NEXT_PUBLIC_SUPABASE_URL is not configured.",
-      );
-    }
+        /**
+         * Upload progress.
+         */
+        xhr.upload.onprogress = (
+          event,
+        ) => {
+          if (
+            event.lengthComputable
+          ) {
+            const percentage =
+              Math.round(
+                (event.loaded /
+                  event.total) *
+                  100,
+              );
 
-    const endpoint =
-      `https://${projectId}.storage.supabase.co/storage/v1/upload/resumable`;
+            setProgress(
+              percentage,
+            );
+          }
+        };
 
-    return new Promise<void>((resolve, reject) => {
-      const upload = new tus.Upload(file, {
-        endpoint,
+        /**
+         * Successful upload.
+         */
+        xhr.onload = () => {
+          if (
+            xhr.status >= 200 &&
+            xhr.status < 300
+          ) {
+            setProgress(100);
 
-        retryDelays: [
-          0,
-          3000,
-          5000,
-          10000,
-          20000,
-        ],
+            resolve();
 
-        headers: {
-          "x-signature": token,
-        },
+            return;
+          }
 
-        uploadDataDuringCreation: true,
+          /**
+           * Try to extract Supabase
+           * error response.
+           */
+          let message =
+            `Supabase Storage upload failed (${xhr.status}).`;
 
-        removeFingerprintOnSuccess: true,
+          try {
+            const response =
+              JSON.parse(
+                xhr.responseText,
+              );
 
-        metadata: {
-          bucketName: "gallery",
-          objectName: path,
-          contentType: file.type,
-          cacheControl: "3600",
-        },
-
-        chunkSize: 6 * 1024 * 1024,
-
-        onError(error) {
-          console.error(
-            "TUS upload error:",
-            error,
-          );
+            if (
+              response?.message
+            ) {
+              message =
+                response.message;
+            } else if (
+              response?.error
+            ) {
+              message =
+                response.error;
+            }
+          } catch {
+            /**
+             * Response was not JSON.
+             */
+          }
 
           reject(
             new Error(
-              error?.message ||
-                "Large file upload failed.",
+              message,
             ),
           );
-        },
+        };
 
-        onProgress(bytesUploaded, bytesTotal) {
-          const percentage =
-            Math.round(
-              (bytesUploaded / bytesTotal) * 100,
-            );
+        /**
+         * Network error.
+         */
+        xhr.onerror = () => {
+          reject(
+            new Error(
+              "Network error while uploading the file to Supabase Storage.",
+            ),
+          );
+        };
 
-          setProgress(percentage);
-        },
+        /**
+         * Request aborted.
+         */
+        xhr.onabort = () => {
+          reject(
+            new Error(
+              "The upload was cancelled.",
+            ),
+          );
+        };
 
-        onSuccess() {
-          resolve();
-        },
-      });
-
-      upload.start();
-    });
+        /**
+         * Start upload.
+         */
+        xhr.send(file);
+      },
+    );
   }
 
+  /**
+   * Main upload process.
+   */
   async function upload() {
     if (!file) {
-      setError("Please select a file first.");
+      setError(
+        "Please select a file first.",
+      );
+
       return;
     }
 
     if (!title.trim()) {
-      setError("Please enter a title.");
+      setError(
+        "Please enter a title.",
+      );
+
       return;
     }
 
     try {
       setUploading(true);
+
       setError("");
+
       setProgress(0);
 
-      /*
+      /**
+       * =====================================================
        * STEP 1
+       * =====================================================
        *
-       * Ask our server for a temporary signed upload token.
+       * Ask our Next.js server to create
+       * a temporary signed upload URL.
        *
-       * IMPORTANT:
-       * We do NOT send the file here.
+       * The file itself is NOT sent here.
        */
       const authorizationResponse =
         await fetch(
           "/api/admin/gallery",
           {
             method: "PUT",
+
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type":
+                "application/json",
             },
+
             body: JSON.stringify({
               fileName: file.name,
-              contentType: file.type,
-              fileSize: file.size,
+
+              contentType:
+                file.type,
+
+              fileSize:
+                file.size,
             }),
           },
         );
 
+      /**
+       * Parse response.
+       */
       const authorizationData =
         await authorizationResponse.json();
 
-      if (!authorizationResponse.ok) {
+      /**
+       * Check authorization request.
+       */
+      if (
+        !authorizationResponse.ok
+      ) {
         throw new Error(
           authorizationData.error ||
             "Unable to authorize upload.",
@@ -262,39 +404,69 @@ export default function GalleryUploader() {
 
       const {
         path,
-        token,
-        projectId,
-      } = authorizationData;
+        signedUrl,
+      } =
+        authorizationData;
 
-      /*
-       * STEP 2
-       *
-       * Upload directly to Supabase.
-       *
-       * Files <= 6 MB use normal upload.
-       *
-       * Files > 6 MB use TUS resumable upload.
+      /**
+       * Make sure the server returned
+       * everything we need.
        */
-      if (file.size > LARGE_FILE_THRESHOLD) {
-        await uploadLargeFile(
-          file,
-          path,
-          token,
-          projectId,
+      if (
+        !path ||
+        typeof path !== "string"
+      ) {
+        throw new Error(
+          "Upload authorization did not return a valid storage path.",
         );
-      } else {
-        await uploadSmallFile(file, path);
-
-        setProgress(100);
       }
 
-      /*
-       * STEP 3
+      if (
+        !signedUrl ||
+        typeof signedUrl !==
+          "string"
+      ) {
+        throw new Error(
+          "Upload authorization did not return a valid signed upload URL.",
+        );
+      }
+
+      /**
+       * =====================================================
+       * STEP 2
+       * =====================================================
        *
-       * Build the public URL.
+       * Upload directly from browser
+       * to Supabase Storage.
+       *
+       * IMPORTANT:
+       *
+       * We intentionally do NOT use:
+       *
+       * tus-js-client
+       *
+       * or:
+       *
+       * /storage/v1/upload/resumable
+       *
+       * This avoids the Invalid Compact JWS
+       * problem occurring on your project.
+       */
+      await uploadFileToSignedUrl(
+        file,
+        signedUrl,
+      );
+
+      /**
+       * =====================================================
+       * STEP 3
+       * =====================================================
+       *
+       * Build public URL.
        */
       const supabaseUrl =
-        process.env.NEXT_PUBLIC_SUPABASE_URL;
+        process.env
+          .NEXT_PUBLIC_SUPABASE_URL;
 
       if (!supabaseUrl) {
         throw new Error(
@@ -305,28 +477,42 @@ export default function GalleryUploader() {
       const publicUrl =
         `${supabaseUrl}/storage/v1/object/public/gallery/${path}`;
 
+      /**
+       * Determine database media type.
+       */
       const mediaType =
-        file.type.startsWith("video")
+        file.type.startsWith(
+          "video",
+        )
           ? "VIDEO"
           : "IMAGE";
 
-      /*
+      /**
+       * =====================================================
        * STEP 4
+       * =====================================================
        *
-       * Save only metadata in Prisma.
+       * Save metadata in Prisma.
        *
-       * The large file is NOT sent to Vercel.
+       * IMPORTANT:
+       *
+       * The actual media file is NOT sent
+       * to Vercel.
        */
       const databaseResponse =
         await fetch(
           "/api/admin/gallery",
           {
             method: "POST",
+
             headers: {
-              "Content-Type": "application/json",
+              "Content-Type":
+                "application/json",
             },
+
             body: JSON.stringify({
-              title: title.trim(),
+              title:
+                title.trim(),
 
               description:
                 description.trim(),
@@ -337,13 +523,15 @@ export default function GalleryUploader() {
 
               url: publicUrl,
 
-              thumbnail: publicUrl,
+              thumbnail:
+                publicUrl,
 
               featured,
 
               tags: [],
 
-              storagePath: path,
+              storagePath:
+                path,
             }),
           },
         );
@@ -351,56 +539,58 @@ export default function GalleryUploader() {
       const databaseData =
         await databaseResponse.json();
 
+      /**
+       * If Prisma fails after the
+       * Storage upload succeeded,
+       * attempt cleanup.
+       */
       if (!databaseResponse.ok) {
-        /*
-         * If Storage succeeded but Prisma failed,
-         * try to remove the orphaned file.
-         */
-        try {
-          const supabase = createClient();
+        console.error(
+                      "Gallery database record creation failed after Storage upload.",
+                      {
+                      storagePath: path,
+                      databaseError: databaseData.error,
+                      },
+                    );
 
-          await supabase.storage
-            .from("gallery")
-            .remove([path]);
-        } catch (cleanupError) {
-          console.error(
-            "Storage cleanup failed:",
-            cleanupError,
+      throw new Error(
+        databaseData.error ||
+          "Gallery database record could not be created.",
           );
-        }
-
-        throw new Error(
-          databaseData.error ||
-            "Gallery database record could not be created.",
-        );
       }
 
-      /*
+      /**
+       * =====================================================
        * STEP 5
+       * =====================================================
        *
        * Success.
        */
       setProgress(100);
 
-      alert("Media uploaded successfully.");
+      alert(
+        "Media uploaded successfully.",
+      );
 
       setOpen(false);
 
       resetForm();
 
-      /*
-       * Refresh the current page so the new
-       * gallery item appears immediately.
+      /**
+       * Refresh gallery.
        */
       window.location.reload();
-    } catch (uploadError) {
+    } catch (
+      uploadError
+    ) {
       console.error(
         "Gallery upload failed:",
         uploadError,
       );
 
       setError(
-        uploadError instanceof Error
+        uploadError instanceof
+          Error
           ? uploadError.message
           : "Upload failed. Please try again.",
       );
@@ -414,6 +604,7 @@ export default function GalleryUploader() {
       <Button
         onClick={() => {
           setError("");
+
           setOpen(true);
         }}
       >
@@ -423,57 +614,77 @@ export default function GalleryUploader() {
       {open && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-background border border-border rounded-lg w-full max-w-lg p-8 my-8">
-
             <h2 className="font-serif text-3xl mb-6">
               Upload Media
             </h2>
 
             <div className="space-y-5">
-
+              {/* FILE */}
               <Field label="Image / Video">
                 <input
                   ref={fileInput}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime"
-                  disabled={uploading}
-                  onChange={handleFileChange}
+                  disabled={
+                    uploading
+                  }
+                  onChange={
+                    handleFileChange
+                  }
                   className="block w-full"
                 />
 
                 {file && (
                   <div className="mt-3 text-sm text-muted-foreground">
                     <p>
-                      <strong>File:</strong>{" "}
+                      <strong>
+                        File:
+                      </strong>{" "}
                       {file.name}
                     </p>
 
                     <p>
-                      <strong>Size:</strong>{" "}
+                      <strong>
+                        Size:
+                      </strong>{" "}
                       {(
                         file.size /
-                        (1024 * 1024)
-                      ).toFixed(2)}{" "}
+                        (1024 *
+                          1024)
+                      ).toFixed(
+                        2,
+                      )}{" "}
                       MB
                     </p>
                   </div>
                 )}
               </Field>
 
+              {/* TITLE */}
               <Field label="Title">
                 <Input
                   value={title}
-                  disabled={uploading}
+                  disabled={
+                    uploading
+                  }
                   onChange={(e) =>
-                    setTitle(e.target.value)
+                    setTitle(
+                      e.target.value,
+                    )
                   }
                   placeholder="Jaipur Wedding"
                 />
               </Field>
 
+              {/* DESCRIPTION */}
               <Field label="Description">
                 <Textarea
-                  value={description}
-                  disabled={uploading}
+                  value={
+                    description
+                  }
+                  disabled={
+                    uploading
+                  }
                   onChange={(e) =>
                     setDescription(
                       e.target.value,
@@ -483,33 +694,46 @@ export default function GalleryUploader() {
                 />
               </Field>
 
+              {/* CATEGORY */}
               <Field label="Category">
                 <select
                   className="w-full border border-border bg-transparent p-3 rounded-sm"
                   value={category}
-                  disabled={uploading}
+                  disabled={
+                    uploading
+                  }
                   onChange={(e) =>
                     setCategory(
                       e.target.value,
                     )
                   }
                 >
-                  {categories.map((c) => (
-                    <option
-                      key={c}
-                      value={c}
-                    >
-                      {c.replace("_", " ")}
-                    </option>
-                  ))}
+                  {categories.map(
+                    (c) => (
+                      <option
+                        key={c}
+                        value={c}
+                      >
+                        {c.replace(
+                          "_",
+                          " ",
+                        )}
+                      </option>
+                    ),
+                  )}
                 </select>
               </Field>
 
+              {/* FEATURED */}
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
-                  checked={featured}
-                  disabled={uploading}
+                  checked={
+                    featured
+                  }
+                  disabled={
+                    uploading
+                  }
                   onChange={(e) =>
                     setFeatured(
                       e.target.checked,
@@ -520,6 +744,7 @@ export default function GalleryUploader() {
                 Featured
               </label>
 
+              {/* PROGRESS */}
               {uploading && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -541,18 +766,15 @@ export default function GalleryUploader() {
                     />
                   </div>
 
-                  {file &&
-                    file.size >
-                      LARGE_FILE_THRESHOLD && (
-                      <p className="text-xs text-muted-foreground">
-                        Large file upload —
-                        resumable upload is
-                        being used.
-                      </p>
-                    )}
+                  <p className="text-xs text-muted-foreground">
+                    Uploading directly
+                    to Supabase
+                    Storage...
+                  </p>
                 </div>
               )}
 
+              {/* ERROR */}
               {error && (
                 <div className="rounded-md border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-400">
                   <strong>
@@ -562,12 +784,16 @@ export default function GalleryUploader() {
                 </div>
               )}
 
+              {/* BUTTONS */}
               <div className="flex justify-end gap-3">
-
                 <Button
                   variant="ghost"
-                  disabled={uploading}
-                  onClick={closeModal}
+                  disabled={
+                    uploading
+                  }
+                  onClick={
+                    closeModal
+                  }
                 >
                   Cancel
                 </Button>
@@ -584,9 +810,7 @@ export default function GalleryUploader() {
                     ? `Uploading ${progress}%`
                     : "Upload"}
                 </Button>
-
               </div>
-
             </div>
           </div>
         </div>
