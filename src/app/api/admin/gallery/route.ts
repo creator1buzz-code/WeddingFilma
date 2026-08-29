@@ -49,7 +49,6 @@ function jsonError(
  *
  * Creates the Prisma GalleryItem record.
  *
- * IMPORTANT:
  * The actual media file is uploaded directly
  * from the browser to Supabase Storage.
  *
@@ -144,7 +143,9 @@ export async function POST(
               ? thumbnail
               : url,
 
-          featured: Boolean(featured),
+          featured: Boolean(
+            featured,
+          ),
 
           tags: Array.isArray(tags)
             ? tags.filter(
@@ -190,13 +191,8 @@ export async function POST(
  *
  * Creates a temporary signed upload URL.
  *
- * IMPORTANT:
- *
- * The actual media file is NOT uploaded
- * through Vercel.
- *
- * The browser will upload directly
- * to Supabase Storage using the signed URL.
+ * The actual media file is uploaded directly
+ * from the browser to Supabase Storage.
  */
 export async function PUT(
   req: NextRequest,
@@ -210,9 +206,6 @@ export async function PUT(
       fileSize,
     } = body;
 
-    /**
-     * Validate filename
-     */
     if (
       !fileName ||
       typeof fileName !== "string"
@@ -222,9 +215,6 @@ export async function PUT(
       );
     }
 
-    /**
-     * Validate MIME type
-     */
     if (
       !contentType ||
       typeof contentType !== "string"
@@ -234,9 +224,6 @@ export async function PUT(
       );
     }
 
-    /**
-     * Validate file size
-     */
     if (
       !Number.isFinite(fileSize) ||
       fileSize <= 0
@@ -246,9 +233,6 @@ export async function PUT(
       );
     }
 
-    /**
-     * Maximum 50 MB
-     */
     if (
       fileSize > MAX_FILE_SIZE
     ) {
@@ -257,9 +241,6 @@ export async function PUT(
       );
     }
 
-    /**
-     * Validate image/video type
-     */
     const isImage =
       ALLOWED_IMAGE_TYPES.includes(
         contentType,
@@ -276,67 +257,27 @@ export async function PUT(
       );
     }
 
-    /**
-     * Extract extension
-     */
     const extension =
       fileName
         .split(".")
         .pop()
         ?.toLowerCase() || "bin";
 
-    /**
-     * Sanitize extension
-     */
     const safeExtension =
       extension.replace(
         /[^a-z0-9]/g,
         "",
       );
 
-    /**
-     * Generate a unique filename.
-     *
-     * Example:
-     *
-     * 8f53dbd8-047f-43e9-9621-866af6acdc1f.jpg
-     */
     const uniqueName =
       `${crypto.randomUUID()}.${safeExtension}`;
 
-    /**
-     * IMPORTANT:
-     *
-     * This is the path INSIDE the bucket.
-     *
-     * Correct:
-     *
-     * abc123.jpg
-     *
-     * NOT:
-     *
-     * gallery/abc123.jpg
-     */
     const storagePath =
       uniqueName;
 
-    /**
-     * Create server-side Supabase admin client.
-     *
-     * SUPABASE_SERVICE_ROLE_KEY
-     * NEVER goes to the browser.
-     */
     const supabaseAdmin =
       getSupabaseAdmin();
 
-    /**
-     * Create signed upload URL.
-     *
-     * This is the important change.
-     *
-     * We are no longer using the TUS
-     * resumable endpoint from the browser.
-     */
     const {
       data,
       error,
@@ -371,16 +312,6 @@ export async function PUT(
       );
     }
 
-    /**
-     * Supabase returns:
-     *
-     * data.signedUrl
-     * data.token
-     * data.path
-     *
-     * We only need the signed URL and path
-     * on the browser side.
-     */
     const projectUrl =
       process.env
         .NEXT_PUBLIC_SUPABASE_URL;
@@ -392,44 +323,12 @@ export async function PUT(
       );
     }
 
-    /**
-     * Diagnostic logging.
-     *
-     * DO NOT log:
-     *
-     * - service role key
-     * - signed URL
-     * - token
-     */
-    console.log(
-      "Gallery upload authorization created:",
-      {
-        bucket: BUCKET,
-        storagePath,
-        contentType,
-        fileSize,
-        projectUrl,
-      },
-    );
-
     return NextResponse.json({
       success: true,
-
       bucket: BUCKET,
-
       path: storagePath,
-
-      /**
-       * Temporary signed URL.
-       *
-       * This is safe to send to the browser
-       * because it is time-limited and scoped
-       * to this particular upload.
-       */
       signedUrl: data.signedUrl,
-
       contentType,
-
       fileSize,
     });
   } catch (error) {
@@ -457,8 +356,10 @@ export async function PUT(
  *
  * Deletes:
  *
- * 1. Supabase Storage object
- * 2. Prisma GalleryItem
+ * 1. The actual object from Supabase Storage
+ * 2. The GalleryItem row from PostgreSQL
+ *
+ * The Storage object is deleted FIRST.
  */
 export async function DELETE(
   req: NextRequest,
@@ -477,7 +378,7 @@ export async function DELETE(
     }
 
     /**
-     * Find gallery record
+     * Find database record.
      */
     const item =
       await prisma.galleryItem.findUnique(
@@ -495,13 +396,20 @@ export async function DELETE(
       );
     }
 
+    /**
+     * Determine the Storage object path
+     * from the public Supabase URL.
+     *
+     * Expected URL:
+     *
+     * https://PROJECT.supabase.co/
+     * storage/v1/object/public/gallery/
+     * filename.jpg
+     */
     let storagePath:
       | string
       | null = null;
 
-    /**
-     * Extract storage path from public URL.
-     */
     try {
       const url =
         new URL(item.url);
@@ -509,62 +417,95 @@ export async function DELETE(
       const marker =
         `/storage/v1/object/public/${BUCKET}/`;
 
-      const index =
+      const markerIndex =
         url.pathname.indexOf(
           marker,
         );
 
-      if (index !== -1) {
+      if (
+        markerIndex !== -1
+      ) {
         storagePath =
           decodeURIComponent(
             url.pathname.substring(
-              index +
+              markerIndex +
                 marker.length,
             ),
           );
       }
-    } catch {
+    } catch (error) {
       console.error(
         "Could not parse gallery URL:",
-        item.url,
+        error,
       );
     }
 
     /**
-     * Delete object from Supabase Storage.
+     * Delete the physical file from
+     * Supabase Storage first.
+     *
+     * Supabase documents remove([...])
+     * as the Storage API for object deletion.
      */
     if (storagePath) {
-      try {
-        const supabaseAdmin =
-          getSupabaseAdmin();
+      const supabaseAdmin =
+        getSupabaseAdmin();
 
-        const {
+      const {
+        data,
+        error,
+      } =
+        await supabaseAdmin.storage
+          .from(BUCKET)
+          .remove([
+            storagePath,
+          ]);
+
+      console.log(
+        "Gallery Storage deletion:",
+        {
+          storagePath,
+          data,
           error,
-        } =
-          await supabaseAdmin.storage
-            .from(BUCKET)
-            .remove([
-              storagePath,
-            ]);
+        },
+      );
 
-        if (error) {
-          console.error(
-            "Storage deletion failed:",
-            error,
-          );
-        }
-      } catch (
-        storageError
-      ) {
+      if (error) {
         console.error(
-          "Storage client error:",
-          storageError,
+          "Supabase Storage deletion failed:",
+          error,
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Could not delete the media file from Supabase Storage. The database record was kept.",
+          },
+          {
+            status: 500,
+          },
+        );
+      }
+
+      /**
+       * If Supabase returns an empty result
+       * because the file no longer exists,
+       * that's still safe to continue.
+       */
+      if (
+        Array.isArray(data) &&
+        data.length === 0
+      ) {
+        console.warn(
+          "Storage deletion returned no deleted objects:",
+          storagePath,
         );
       }
     }
 
     /**
-     * Delete database record.
+     * Only after Storage deletion succeeds,
+     * remove the Prisma record.
      */
     await prisma.galleryItem.delete(
       {
@@ -576,6 +517,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
+      deletedId: id,
+      storagePath,
     });
   } catch (error) {
     console.error(
@@ -586,7 +529,9 @@ export async function DELETE(
     return NextResponse.json(
       {
         error:
-          "Failed to delete gallery item.",
+          error instanceof Error
+            ? error.message
+            : "Failed to delete gallery item.",
       },
       {
         status: 500,
