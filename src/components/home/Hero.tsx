@@ -11,21 +11,14 @@ export default function Hero() {
       data-testid="hero-section"
       className="relative min-h-screen w-full overflow-hidden cinema-vignette"
     >
-      {/* Video background */}
+      {/* Image background */}
       <div className="absolute inset-0">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          poster="https://images.unsplash.com/photo-1519741497674-611481863552?w=2000&q=80"
+        <img
+          src="/images/hero-wedding.jpg"
+          alt="WeddingFilma cinematic wedding photography"
           className="h-full w-full object-cover"
-        >
-          <source
-            src="https://cdn.pixabay.com/video/2022/12/23/144207-782937232_large.mp4"
-            type="video/mp4"
-          />
-        </video>
+        />
+
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/20 to-background" />
       </div>
 
@@ -33,11 +26,13 @@ export default function Hero() {
       <div className="absolute left-6 top-24 md:left-12 md:top-32 z-10 hidden md:block">
         <div className="flex items-center gap-4">
           <div className="h-px w-16 bg-accent" />
-          <p className="text-[11px] tracking-[0.4em] uppercase text-accent">Est. India · Vol. XII</p>
+          <p className="text-[11px] tracking-[0.4em] uppercase text-accent">
+            Est. India · Vol. XII
+          </p>
         </div>
       </div>
 
-      {/* Scarcity / capacity widget (replaces the corner tick) */}
+      {/* Scarcity / capacity widget */}
       <CapacityBadge />
 
       {/* Center text */}
@@ -50,6 +45,7 @@ export default function Hero() {
         >
           Cinematic Wedding Films · Photography · India
         </motion.p>
+
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -58,16 +54,20 @@ export default function Hero() {
         >
           Love, framed like
           <br />
-          <em className="text-accent italic font-normal">a film that lasts</em> forever.
+          <em className="text-accent italic font-normal">
+            a film that lasts
+          </em>{" "}
+          forever.
         </motion.h1>
+
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.9, delay: 0.5 }}
           className="mt-10 max-w-lg text-base md:text-lg text-muted-foreground text-pretty"
         >
-          A boutique studio crafting heirloom photographs and cinematic wedding films for
-          couples with taste — across India and beyond.
+          A boutique studio crafting heirloom photographs and cinematic
+          wedding films for couples with taste — across India and beyond.
         </motion.p>
 
         <motion.div
@@ -84,6 +84,7 @@ export default function Hero() {
             Book Your Shoot
             <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Link>
+
           <Link
             href="/portfolio"
             data-testid="cta-portfolio-hero"
@@ -99,9 +100,22 @@ export default function Hero() {
       <div className="absolute bottom-0 inset-x-0 z-10 border-t border-foreground/10 bg-background/40 backdrop-blur-md overflow-hidden">
         <div className="marquee-track py-4">
           {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-16 pr-16 shrink-0">
-              {["Vogue Wedding Show", "Condé Nast Traveller", "WeddingSutra Editor's Pick", "Brides Today", "Featured on Netflix India", "Elle India"].map((t) => (
-                <span key={t + i} className="text-[11px] tracking-[0.4em] uppercase text-muted-foreground">
+            <div
+              key={i}
+              className="flex items-center gap-16 pr-16 shrink-0"
+            >
+              {[
+                "Vogue Wedding Show",
+                "Condé Nast Traveller",
+                "WeddingSutra Editor's Pick",
+                "Brides Today",
+                "Featured on Netflix India",
+                "Elle India",
+              ].map((t) => (
+                <span
+                  key={t + i}
+                  className="text-[11px] tracking-[0.4em] uppercase text-muted-foreground"
+                >
                   ✦ {t}
                 </span>
               ))}
